@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fresh Meat</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: #141414;
+    color: #d8d8d8;
+    font-family: Tahoma, Verdana, sans-serif;
+    font-size: 15px;
+  }
+
+  /* crime scene tape */
+  .tape {
+    position: absolute; left: -10%; width: 120%; height: 46px;
+    background: #f2c40c; color: #111;
+    font-family: Impact, "Arial Narrow", sans-serif; font-size: 24px; letter-spacing: 3px;
+    line-height: 46px; white-space: nowrap; overflow: hidden;
+    border-top: 3px solid #111; border-bottom: 3px solid #111;
+  }
+  .tape.one { top: 70px; transform: rotate(-4deg); }
+  .tape.two { bottom: 120px; transform: rotate(3deg); opacity: 0.9; }
+  .tape span { display: inline-block; animation: slide 40s linear infinite; }
+  .tape.two span { animation-direction: reverse; }
+  @keyframes slide { to { transform: translateX(-50%); } }
+
+  .main { position: absolute; left: 7%; top: 220px; width: 52%; }
+  .tag { display: inline-block; background: #a01010; color: #fff; font-size: 12px; font-weight: bold; padding: 3px 7px; letter-spacing: 1px; }
+  .name {
+    font-family: Impact, "Arial Narrow", sans-serif; font-size: 92px; line-height: 1;
+    color: #f0f0f0; text-transform: uppercase; margin-top: 10px; letter-spacing: 1px;
+  }
+  .modes { color: #8c8c8c; margin-top: 6px; }
+
+  .loading { margin-top: 60px; }
+  .label { color: #777; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; }
+  .map { font-family: Impact, "Arial Narrow", sans-serif; font-size: 34px; color: #f2c40c; margin-top: 4px; }
+  .line { height: 3px; background: #2c2c2c; margin-top: 16px; width: 100%; }
+  .line div { height: 100%; width: 0%; background: #f2c40c; transition: width 0.3s; }
+  .status { font-family: Consolas, "Courier New", monospace; font-size: 13px; color: #8c8c8c; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .tip { margin-top: 40px; color: #bdbdbd; max-width: 640px; line-height: 1.5; }
+  .tip b { color: #fff; }
+
+  .staff { position: absolute; right: 7%; top: 220px; width: 300px; border-left: 3px solid #f2c40c; padding-left: 18px; }
+  .staff h2 { font-family: Impact, "Arial Narrow", sans-serif; font-weight: normal; font-size: 26px; color: #f0f0f0; letter-spacing: 1px; }
+  .staff ul { list-style: none; margin-top: 12px; }
+  .staff li { padding: 7px 0; border-bottom: 1px solid #262626; display: flex; justify-content: space-between; align-items: center; }
+  .rank { font-size: 11px; font-weight: bold; padding: 2px 6px; color: #fff; letter-spacing: 1px; }
+  .rank.owner { background: #a01010; }
+  .rank.admin { background: #b5651d; }
+  .rank.mod { background: #2d6a2d; }
+  .staff .empty { color: #666; font-size: 13px; margin-top: 10px; }
+
+  .bottom { position: absolute; left: 7%; right: 7%; bottom: 40px; display: flex; justify-content: space-between; color: #777; font-size: 13px; }
+  .bottom b { color: #ccc; font-weight: normal; }
+</style>
+</head>
+<body>
+
+<div class="tape one"><span id="tape1"></span></div>
+<div class="tape two"><span id="tape2"></span></div>
+
+<div class="main">
+  <span class="tag">Z-CITY</span>
+  <div class="name">Fresh Meat</div>
+  <div class="modes">Homicide / Active Shooter / Survival</div>
+
+  <div class="loading">
+    <div class="label">Now loading</div>
+    <div class="map" id="map">...</div>
+    <div class="line"><div id="fill"></div></div>
+    <div class="status" id="status">Connecting</div>
+  </div>
+
+  <div class="tip" id="tip"></div>
+</div>
+
+<div class="staff">
+  <h2>Staff</h2>
+  <ul id="staff"></ul>
+</div>
+
+<div class="bottom">
+  <span>First time here? Subscribe to the Workshop collection and you'll load way faster.</span>
+  <span>Discord: <b id="discord"></b></span>
+</div>
+
+<script>
+  // ---- edit these ----
+  var DISCORD = "coming soon";
+  // rank: "owner", "admin" or "mod"
+  var STAFF = [
+    { name: "Most random canadian", rank: "owner" }
+  ];
+  var TIPS = [
+    "<b>Active Shooter:</b> one player is a Kung Fu Master. Get them close to the shooter.",
+    "<b>Planks</b> lock a door shut. Smash or shoot them to get through.",
+    "<b>Bleeding out?</b> Tourniquets and bandages are in the loot. Use them.",
+    "<b>Police</b> show up a few minutes in. You just have to last until then.",
+    "<b>Esc &rarr; Binds</b> lets you put the mighty kick on a key.",
+    "<b>The murderer</b> looks exactly like everyone else.",
+    "<b>Door stuck.</b> Please. I beg you."
+  ];
+  // --------------------
+
+  var tapeText = "";
+  for (var i = 0; i < 16; i++) tapeText += "CRIME SCENE &nbsp; DO NOT CROSS &nbsp; &bull; &nbsp; ";
+  document.getElementById("tape1").innerHTML = tapeText;
+  document.getElementById("tape2").innerHTML = tapeText;
+  document.getElementById("discord").textContent = DISCORD;
+
+  var RANK_NAMES = { owner: "OWNER", admin: "ADMIN", mod: "MOD" };
+  var list = document.getElementById("staff");
+  STAFF.forEach(function (s) {
+    var li = document.createElement("li");
+    var n = document.createElement("span");
+    n.textContent = s.name;
+    var r = document.createElement("span");
+    r.className = "rank " + s.rank;
+    r.textContent = RANK_NAMES[s.rank] || s.rank.toUpperCase();
+    li.appendChild(n); li.appendChild(r);
+    list.appendChild(li);
+  });
+
+  var tipEl = document.getElementById("tip"), tipIdx = Math.floor(Math.random() * TIPS.length);
+  tipEl.innerHTML = TIPS[tipIdx];
+  setInterval(function () { tipIdx = (tipIdx + 1) % TIPS.length; tipEl.innerHTML = TIPS[tipIdx]; }, 8000);
+
+  // ---- Garry's Mod calls these while you load ----
+  var needed = 0, remaining = 0;
+  var statusEl = document.getElementById("status"), fillEl = document.getElementById("fill");
+  function setProgress() {
+    if (needed > 0) fillEl.style.width = Math.max(2, Math.round((needed - remaining) / needed * 100)) + "%";
+  }
+  function GameDetails(servername, serverurl, mapname) { document.getElementById("map").textContent = mapname || "unknown map"; }
+  function SetFilesTotal(total) { needed = total; remaining = total; setProgress(); }
+  function SetFilesNeeded(left) { remaining = left; setProgress(); }
+  function DownloadingFile(file) { statusEl.textContent = file; if (remaining > 0) remaining--; setProgress(); }
+  function SetStatusChanged(status) { statusEl.textContent = status; }
+
+  // opened in a normal browser instead of GMod: fake some progress so the page can be previewed
+  if (!/GMod/i.test(navigator.userAgent)) {
+    GameDetails("Fresh Meat", "", "mu_hmcd_workplace_v3");
+    SetFilesTotal(40);
+    var fake = 40;
+    setInterval(function () {
+      if (fake > 0) { fake--; DownloadingFile("materials/models/props/file_" + fake + ".vtf"); }
+      else SetStatusChanged("Sending client info...");
+    }, 350);
+  }
+</script>
+</body>
+</html>
